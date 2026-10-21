@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ckb" dir="rtl">
+<head>
+<meta charset="utf-8">
+<!-- ═══════════════════════════════════════════════════════════════
+     غلاف PWA لتطبيق «سجل الموظفين»
+     يفتح تطبيق Apps Script بملء الشاشة داخل إطار، ويضيف:
+     التثبيت على الجهاز، أيقونة، شاشة بدء، وشاشة «لا يوجد اتصال».
+     ═══════════════════════════════════════════════════════════════ -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>تۆماری فەرمانبەران</title>
+<meta name="description" content="سجل الموظفين — Employee Registry">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#151e1b" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!-- iOS: فتح بلا شريط متصفح بعد «إضافة إلى الشاشة الرئيسية» -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="فەرمانبەران">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+  :root{
+    --bg:#f3f6f5; --top:#ffffff; --surface:#ffffff; --ink:#14211d; --muted:#5d6c66; --line:#e1e8e5;
+    --brand:#0d5c4f; --brand-ink:#ffffff; --brand-soft:#e3f1ed;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){ :root{
+    --bg:#0e1513; --top:#151e1b; --surface:#151e1b; --ink:#e7efec; --muted:#9fb0aa; --line:#24312d;
+    --brand:#4fc2a8; --brand-ink:#06201a; --brand-soft:#15302a; color-scheme:dark;
+  }}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--top);color:var(--ink);
+    font:15px/1.6 "Noto Sans Arabic","Segoe UI",Tahoma,system-ui,sans-serif;overflow:hidden}
+  /* المساحات الآمنة (النوتش وشريط الإيماءات) تُترك بلون الشريط العلوي */
+  body{padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+  #app{display:block;width:100%;height:100%;border:0;background:var(--bg)}
+  .hidden{display:none!important}
+
+  /* شاشة البدء / عدم الاتصال */
+  .screen{position:fixed;inset:0;z-index:5;display:grid;place-items:center;background:var(--bg);padding:24px;text-align:center}
+  .screen .box{max-width:340px;display:grid;justify-items:center;gap:10px}
+  .logo{width:84px;height:84px;border-radius:22px;box-shadow:0 10px 30px -8px rgba(13,92,79,.45)}
+  .screen h1{font-size:19px;margin:6px 0 0}
+  .screen p{margin:0;color:var(--muted);font-size:14px}
+  .spin{width:28px;height:28px;margin-top:10px;border:3px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:sp .9s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .btn{margin-top:8px;border:0;border-radius:12px;padding:11px 22px;font:inherit;font-weight:700;background:var(--brand);color:var(--brand-ink);cursor:pointer}
+  .btn.ghost{background:transparent;color:var(--muted);font-weight:500;padding:8px 10px}
+  #slow{font-size:13px}
+
+  /* شريط التثبيت */
+  .install{position:fixed;z-index:6;inset-inline:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));margin:auto;max-width:440px;
+    display:flex;align-items:center;gap:12px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;
+    padding:12px 12px 12px 14px;box-shadow:0 18px 48px -12px rgba(0,0,0,.35);animation:up .3s ease-out}
+  .install img{width:42px;height:42px;border-radius:11px;flex:none}
+  .install .txt{flex:1;min-width:0;font-size:13.5px;line-height:1.5}
+  .install .txt b{display:block;font-size:14.5px}
+  .install .btn{margin:0;padding:9px 16px}
+  .install .x{border:0;background:none;color:var(--muted);font-size:20px;line-height:1;padding:6px;cursor:pointer}
+  @keyframes up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important}.spin{animation-duration:2s!important}}
+</style>
+</head>
+<body>
+
+<!-- التطبيق نفسه (يُحمَّل من Google) -->
+<iframe id="app" title="تۆماری فەرمانبەران" allow="clipboard-write; web-share; fullscreen"></iframe>
+
+<!-- شاشة البدء -->
+<div class="screen" id="splash">
+  <div class="box">
+    <img class="logo" src="icon-192.png" alt="">
+    <h1 id="t-name">تۆماری فەرمانبەران</h1>
+    <div class="spin"></div>
+    <p id="slow" class="hidden"></p>
+    <button class="btn ghost hidden" id="retry1" type="button"></button>
+  </div>
+</div>
+
+<!-- شاشة عدم الاتصال -->
+<div class="screen hidden" id="offline">
+  <div class="box">
+    <img class="logo" src="icon-192.png" alt="">
+    <h1 id="off-title"></h1>
+    <p id="off-text"></p>
+    <button class="btn" id="retry2" type="button"></button>
+  </div>
+</div>
+
+<!-- شريط التثبيت -->
+<div class="install hidden" id="install" role="dialog" aria-live="polite">
+  <img src="icon-192.png" alt="">
+  <div class="txt"><b id="in-title"></b><span id="in-text"></span></div>
+  <button class="btn hidden" id="in-go" type="button"></button>
+  <button class="x" id="in-x" type="button" aria-label="Close">×</button>
+</div>
+
+<script>
+/* ════════ الإعداد: ضع هنا رابط تطبيق الويب (Deploy › Web app URL) ════════ */
+const APP_URL = 'https://script.google.com/macros/s/AKfycbxAblz-57kemhTYetwobyMtUgwIM-eBYznwY7bxePadqSwQffrqs-7ELQ0-cB5FrmBcEQ/exec';
+
+/* ──── النصوص بثلاث لغات حسب لغة الجهاز */
+const LANG = (navigator.language || '').slice(0, 2) === 'ar' ? 'ar' : (navigator.language || '').slice(0, 2) === 'en' ? 'en' : 'ckb';
+const T = {
+  name:     ['تۆماری فەرمانبەران', 'سجل الموظفين', 'Employee Registry'],
+  slow:     ['بارکردن هەندێک دەخایەنێت…', 'التحميل يستغرق وقتاً أطول من المعتاد…', 'Loading is taking longer than usual…'],
+  retry:    ['دووبارە هەوڵ بدەرەوە', 'إعادة المحاولة', 'Try again'],
+  offTitle: ['پەیوەندی ئینتەرنێت نییە', 'لا يوجد اتصال بالإنترنت', 'You are offline'],
+  offText:  ['ئەپەکە پێویستی بە ئینتەرنێتە بۆ هێنانی داتا. کە پەیوەندی گەڕایەوە خۆکارانە دەکرێتەوە.',
+             'يحتاج التطبيق إلى الإنترنت لجلب البيانات. سيفتح تلقائياً عند عودة الاتصال.',
+             'The app needs the internet to load data. It will open automatically when you are back online.'],
+  inTitle:  ['دامەزراندنی ئەپ', 'تثبيت التطبيق', 'Install the app'],
+  inText:   ['وەک ئەپێکی ڕاستەقینە لەسەر ئامێرەکەت بیکەرەوە.', 'افتحه كتطبيق حقيقي على جهازك.', 'Open it like a real app on your device.'],
+  inGo:     ['دامەزراندن', 'تثبيت', 'Install'],
+  iosText:  ['دوگمەی «هاوبەشکردن» ⬆︎ دابگرە، پاشان «Add to Home Screen».',
+             'اضغط زر «مشاركة» ⬆︎ ثم «إضافة إلى الشاشة الرئيسية».',
+             'Tap Share ⬆︎, then “Add to Home Screen”.']
+};
+const t = k => T[k][LANG === 'ar' ? 1 : LANG === 'en' ? 2 : 0];
+document.documentElement.lang = LANG;
+document.documentElement.dir = LANG === 'en' ? 'ltr' : 'rtl';
+document.title = t('name');
+const $ = id => document.getElementById(id);
+$('t-name').textContent = t('name');
+$('slow').textContent = t('slow');
+$('retry1').textContent = $('retry2').textContent = t('retry');
+$('off-title').textContent = t('offTitle');
+$('off-text').textContent = t('offText');
+$('in-title').textContent = t('inTitle');
+$('in-go').textContent = t('inGo');
+
+/* ──── تحميل التطبيق داخل الإطار */
+const frame = $('app');
+let loaded = false, slowT;
+function openApp() {
+  if (!navigator.onLine) { $('offline').classList.remove('hidden'); return; }
+  $('offline').classList.add('hidden');
+  $('splash').classList.remove('hidden');
+  $('slow').classList.add('hidden'); $('retry1').classList.add('hidden');
+  loaded = false;
+  frame.src = APP_URL + (APP_URL.includes('?') ? '&' : '?') + 'pwa=1';
+  clearTimeout(slowT);
+  // بعد 8 ثوانٍ تُخفى شاشة البدء على أي حال، ليظهر ما في الإطار (التطبيق أو رسالة خطأ من Google)
+  slowT = setTimeout(() => { if (!loaded) $('splash').classList.add('hidden'); }, 8000);
+}
+frame.addEventListener('load', () => {
+  if (!frame.src) return;
+  loaded = true; clearTimeout(slowT);
+  setTimeout(() => $('splash').classList.add('hidden'), 250); // مهلة قصيرة ليرسم التطبيق شاشته الأولى
+});
+$('retry1').onclick = $('retry2').onclick = openApp;
+// التطبيق يطلب إعادة فتحه (مثلاً بعد تغيير اللغة): نعيد تحميل الإطار بدل صفحة فارغة
+window.addEventListener('message', e => {
+  if (e.data !== 'karmendan:reload' || !/\.googleusercontent\.com$/.test(new URL(e.origin).hostname)) return;
+  try { e.source.postMessage('karmendan:reload-ack', '*'); } catch (_) {}
+  openApp();
+});
+window.addEventListener('online', () => { if (!loaded || !$('offline').classList.contains('hidden')) openApp(); });
+openApp();
+
+/* ──── تسجيل الـ Service Worker */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+
+/* ──── زر التثبيت (Android / Chrome / Edge) وتعليمات iPhone/iPad */
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const DISMISS = 'karmendan_install_dismissed';
+const dismissed = () => { try { return Date.now() - Number(localStorage.getItem(DISMISS) || 0) < 14 * 864e5; } catch (e) { return false; } };
+let deferred = null;
+function showInstall(ios) {
+  if (standalone || dismissed()) return;
+  $('in-text').textContent = ios ? t('iosText') : t('inText');
+  $('in-go').classList.toggle('hidden', ios);
+  setTimeout(() => $('install').classList.remove('hidden'), 4000); // بعد أن يبدأ المستخدم بالتطبيق
+}
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; showInstall(false); });
+$('in-go').onclick = async () => {
+  if (!deferred) return;
+  $('install').classList.add('hidden');
+  deferred.prompt(); await deferred.userChoice.catch(() => {}); deferred = null;
+};
+$('in-x').onclick = () => { $('install').classList.add('hidden'); try { localStorage.setItem(DISMISS, String(Date.now())); } catch (e) {} };
+window.addEventListener('appinstalled', () => $('install').classList.add('hidden'));
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+if (isIOS && !standalone) showInstall(true);
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "id": "./",
+  "name": "تۆماری فەرمانبەران",
+  "short_name": "فەرمانبەران",
+  "description": "سجل الموظفين — Employee Registry",
+  "lang": "ckb",
+  "dir": "rtl",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0d5c4f",
+  "background_color": "#f3f6f5",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
